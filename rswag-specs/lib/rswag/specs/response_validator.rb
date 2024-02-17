@@ -82,7 +82,7 @@ module Rswag
         defs_refs(bundled_schema)
 
         options = {
-          meta_schema: JSONSchemer.openapi31,
+          meta_schema: JSONSchemer.draft202012,
           ref_resolver: proc do |uri|
             if uri.to_s == 'http://tempuri.org/rswag/specs/extended_schema'
               {}
@@ -93,7 +93,7 @@ module Rswag
           format: false,
         }
 
-        pp bundled_schema
+        puts bundled_schema.to_json
         bundled_schema = JSONSchemer.schema(bundled_schema, **options).bundle
 
         JSONSchemer.schema(is_strict(metadata) ? strict_schema(bundled_schema) : bundled_schema, **options)
