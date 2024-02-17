@@ -75,9 +75,11 @@ module Rswag
       def schema(validation_schema, metadata)
         json_schema = JSON.parse(validation_schema.to_json)
         bundled_schema = {
-          "$defs" => (json_schema.dig('components', 'schemas') || {})
+          "$defs" => json_schema.dig('components', 'schemas') || json_schema.dig('definitions') || {},
         }.merge(json_schema)
         bundled_schema.delete('components')
+        bundled_schema.delete('definitions')
+        defs_refs(bundled_schema)
 
         options = {
           meta_schema: JSONSchemer.openapi31,
@@ -91,9 +93,26 @@ module Rswag
           format: false,
         }
 
-        bundled_schema = JSONSchemer.schema(json_schema, **options).bundle
+        pp bundled_schema
+        bundled_schema = JSONSchemer.schema(bundled_schema, **options).bundle
 
         JSONSchemer.schema(is_strict(metadata) ? strict_schema(bundled_schema) : bundled_schema, **options)
+      end
+
+      def defs_refs(schema)
+        if schema.is_a?(Hash)
+          if schema['$ref'].is_a?(String)
+            schema['$ref'].gsub!(/#\/?(.*)\/(\w+)/, "#/$defs/\\2")
+          end
+
+          schema.keys.each do |key|
+            defs_refs(schema[key])
+          end
+        elsif schema.is_a?(Array)
+          schema.each_with_index do |elem, idx|
+            defs_refs(elem)
+          end
+        end
       end
 
       def strict_schema(schema)
@@ -106,10 +125,6 @@ module Rswag
             if schema['additionalProperties'] != true
               schema['additionalProperties'] = false
             end
-          end
-
-          if schema['$ref'].is_a?(String)
-            schema['$ref'].gsub!("#/components/schemas/", "#/$defs/")
           end
 
           schema.keys.each do |key|

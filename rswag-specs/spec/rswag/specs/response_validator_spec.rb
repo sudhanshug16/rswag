@@ -127,7 +127,7 @@ module Rswag
             it { expect { call }.not_to raise_error }
           end
 
-          context "with strict schema validation disabled in config but enabled in metadata" do
+          context "with strict schema validation disabled in config but enabled in metadata", focus: true do
             let(:openapi_strict_schema_validation) { false }
             let(:metadata) { super().merge(openapi_strict_schema_validation: true) }
 
@@ -143,7 +143,7 @@ module Rswag
         end
 
         context 'referenced schemas' do
-          xcontext 'swagger 2.0' do
+          context 'swagger 2.0' do
             before do
               openapi_spec[:definitions] = {
                 'blog' => {
@@ -177,7 +177,7 @@ module Rswag
                 metadata[:response][:schema] = { '$ref' => '#/components/schemas/blog' }
               end
 
-              it 'uses the referenced schema to validate the response body' do
+              it 'uses the referenced schema to validate the response body', focus: true do
                 expect { call }.to raise_error(/Expected response body/)
               end
 
@@ -268,7 +268,7 @@ module Rswag
               end
             end
 
-            xcontext 'deprecated definitions' do
+            context 'deprecated definitions' do
               before do
                 allow(Rswag::Specs.deprecator).to receive(:warn)
                 allow(config).to receive(:get_openapi_spec_version).and_return('3.0.1')
