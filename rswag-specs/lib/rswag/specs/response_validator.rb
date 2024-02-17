@@ -84,7 +84,7 @@ module Rswag
         }
 
         options = {
-          meta_schema: JSONSchemer.openapi30,
+          meta_schema: JSONSchemer.openapi31,
           ref_resolver: proc do |uri|
             if uri.to_s == 'http://tempuri.org/rswag/specs/extended_schema'
               {}
