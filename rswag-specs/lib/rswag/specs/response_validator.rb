@@ -62,7 +62,6 @@ module Rswag
           # .merge('$schema' => 'http://tempuri.org/rswag/specs/extended_schema')
           .merge(schemas)
 
-        pp validation_schema
         results = schema(validation_schema, metadata).validate(JSON.parse(body))
 
         errors = results.map{ |result| result['error'].presence }.compact
@@ -83,12 +82,10 @@ module Rswag
             )
           }
         }
-        pp bundled_schema
 
         options = {
           meta_schema: JSONSchemer.openapi30,
           ref_resolver: proc do |uri|
-            pp "ref #{uri}"
             if uri.to_s == 'http://tempuri.org/rswag/specs/extended_schema'
               {}
             else
@@ -107,7 +104,7 @@ module Rswag
 
       def strict_schema(schema)
         if schema.is_a?(Hash)
-          if schema['type'] == 'object' && schema['properties']&.keys&.length != 0
+          if schema['type'] == 'object' && !schema['properties'].nil? && schema['properties'].keys.length != 0
             if schema['required']&.length != 0
               schema['required'] = schema['properties'].keys
             end
