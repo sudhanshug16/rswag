@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 require 'active_support/core_ext/hash/slice'
-require 'json-schema'
+require 'json_schemer'
 require 'json'
-require 'rswag/specs/extended_schema'
+# require 'rswag/specs/extended_schema'
 
 module Rswag
   module Specs
@@ -59,12 +59,13 @@ module Rswag
         schemas = definitions_or_component_schemas(swagger_doc, version)
 
         validation_schema = response_schema
-          .merge('$schema' => 'http://tempuri.org/rswag/specs/extended_schema')
+          # .merge('$schema' => 'http://tempuri.org/rswag/specs/extended_schema')
           .merge(schemas)
 
-        validation_options = validation_options_from(metadata)
+        pp validation_schema
+        results = schema(validation_schema, metadata).validate(JSON.parse(body))
 
-        errors = JSON::Validator.fully_validate(validation_schema, body, validation_options)
+        errors = results.map{ |result| result['error'].presence }.compact
         return unless errors.any?
 
         raise UnexpectedResponse,
@@ -72,15 +73,69 @@ module Rswag
               "Response body: #{JSON.pretty_generate(JSON.parse(body))}"
       end
 
-      def validation_options_from(metadata)
+      def schema(validation_schema, metadata)
+        json_schema = JSON.parse(validation_schema.to_json)
+        bundled_schema = {
+          "openapi" => "3.1.0",
+          "components" => {
+            "schemas" => (json_schema.dig('components', 'schemas') || {}).merge(
+              "Object" => json_schema
+            )
+          }
+        }
+        pp bundled_schema
+
+        options = {
+          meta_schema: JSONSchemer.openapi30,
+          ref_resolver: proc do |uri|
+            pp "ref #{uri}"
+            if uri.to_s == 'http://tempuri.org/rswag/specs/extended_schema'
+              {}
+            else
+              JSON.parse(Net::HTTP.get(uri))
+            end
+          end,
+          format: false,
+        }
+
+        # bundled_schema = JSONSchemer.schema(json_schema, **options).bundle
+
+        JSONSchemer.openapi(
+          is_strict(metadata) ? strict_schema(bundled_schema) : bundled_schema, **options
+        ).ref('#/components/schemas/Object')
+      end
+
+      def strict_schema(schema)
+        if schema.is_a?(Hash)
+          if schema['type'] == 'object' && schema['properties']&.keys&.length != 0
+            if schema['required']&.length != 0
+              schema['required'] = schema['properties'].keys
+            end
+
+            if schema['additionalProperties'] != true
+              schema['additionalProperties'] = false
+            end
+          end
+
+          schema.keys.each do |key|
+            strict_schema(schema[key])
+          end
+        elsif schema.is_a?(Array)
+          schema.each_with_index do |elem, idx|
+            strict_schema(elem)
+          end
+        end
+
+        schema
+      end
+
+      def is_strict(metadata)
         if metadata.key?(:swagger_strict_schema_validation)
           Rswag::Specs.deprecator.warn('Rswag::Specs: WARNING: This option will be renamed to "openapi_strict_schema_validation" in v3.0')
           is_strict = !!metadata[:swagger_strict_schema_validation]
         else
           is_strict = !!metadata.fetch(:openapi_strict_schema_validation, @config.openapi_strict_schema_validation)
         end
-
-        { strict: is_strict }
       end
 
       def definitions_or_component_schemas(swagger_doc, version)

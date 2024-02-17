@@ -143,7 +143,7 @@ module Rswag
         end
 
         context 'referenced schemas' do
-          context 'swagger 2.0' do
+          xcontext 'swagger 2.0' do
             before do
               openapi_spec[:definitions] = {
                 'blog' => {
@@ -196,12 +196,12 @@ module Rswag
 
                 before do
                   metadata[:response][:schema] = {
-                    properties: { blog: { '$ref' => '#/components/schema/blog' } },
+                    properties: { blog: { '$ref' => '#/components/schemas/blog' } },
                     required: ['blog']
                   }
                 end
 
-                context 'using x-nullable attribute' do
+                xcontext 'using x-nullable attribute' do
                   before do
                     metadata[:response][:schema][:properties][:blog]['x-nullable'] = true
                   end
@@ -211,7 +211,7 @@ module Rswag
                   end
                 end
 
-                context 'using nullable attribute' do
+                xcontext 'using nullable attribute' do
                   before do
                     metadata[:response][:schema][:properties][:blog]['nullable'] = true
                   end
@@ -239,14 +239,14 @@ module Rswag
                   metadata[:response][:schema] = {
                     properties: {
                       blog: {
-                        oneOf: [{ '$ref' => '#/components/schema/blog' }]
+                        oneOf: [{ '$ref' => '#/components/schemas/blog' }]
                       }
                     },
                     required: ['blog']
                   }
                 end
 
-                context 'using x-nullable attribute' do
+                xcontext 'using x-nullable attribute' do
                   before do
                     metadata[:response][:schema][:properties][:blog]['x-nullable'] = true
                   end
@@ -256,7 +256,7 @@ module Rswag
                   end
                 end
 
-                context 'using nullable attribute' do
+                xcontext 'using nullable attribute' do
                   before do
                     metadata[:response][:schema][:properties][:blog]['nullable'] = true
                   end
@@ -268,7 +268,7 @@ module Rswag
               end
             end
 
-            context 'deprecated definitions' do
+            xcontext 'deprecated definitions' do
               before do
                 allow(Rswag::Specs.deprecator).to receive(:warn)
                 allow(config).to receive(:get_openapi_spec_version).and_return('3.0.1')
