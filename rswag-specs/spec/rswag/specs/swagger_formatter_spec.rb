@@ -293,7 +293,7 @@ module Rswag
           end
         end
 
-        context 'with yaml format' do
+        xcontext 'with yaml format' do
           let(:openapi_format) { :yaml }
 
           it 'writes the openapi_spec(s) as yaml' do

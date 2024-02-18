@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'active_support/core_ext/hash/slice'
-require 'jsi'
+require 'json_schemer'
 require 'json'
 # require 'rswag/specs/extended_schema'
 
@@ -62,11 +62,11 @@ module Rswag
           # .merge('$schema' => 'http://tempuri.org/rswag/specs/extended_schema')
           .merge(schemas)
 
-        # results = schema(validation_schema, metadata).validate(JSON.parse(body))
-        result = schema(validation_schema, metadata).new_jsi(JSON.parse(body)).jsi_validate
+        results = schema(validation_schema, metadata).validate(JSON.parse(body))
+        # result = schema(validation_schema, metadata).new_jsi(JSON.parse(body)).jsi_validate
 
-        # errors = results.map{ |result| result['error'].presence }.compact
-        errors = result.validation_errors.map{ |result| result.message.presence }.compact
+        errors = results.map{ |result| result['error'].presence }.compact
+        # errors = result.validation_errors.map{ |result| result.to_json }.compact
         return unless errors.any?
 
         raise UnexpectedResponse,
@@ -76,12 +76,11 @@ module Rswag
 
       def schema(validation_schema, metadata)
         json_schema = JSON.parse(validation_schema.to_json)
-        bundled_schema = {
+        bundled_schema = json_schema.merge({
           "$schema" => "http://json-schema.org/draft-07/schema#",
-          "$defs" => json_schema.dig('components', 'schemas') || json_schema.dig('definitions') || {},
-        }.merge(json_schema)
+          "definitions" => json_schema.dig('components', 'schemas') || json_schema.dig('definitions') || {},
+        })
         bundled_schema.delete('components')
-        bundled_schema.delete('definitions')
         defs_refs(bundled_schema)
 
         # options = {
@@ -96,18 +95,17 @@ module Rswag
         #   format: false,
         # }
 
-        puts bundled_schema.to_json
-        # bundled_schema = JSONSchemer.schema(bundled_schema, **options).bundle
+        bundled_schema = JSONSchemer.schema(bundled_schema).bundle
         bundled_schema = is_strict(metadata) ? strict_schema(bundled_schema) : bundled_schema
 
-        JSI.new_schema(bundled_schema).jsi_schema_module
-        # JSONSchemer.schema(bundled_schema, **options)
+        # JSI.new_schema(bundled_schema).jsi_schema_module
+        JSONSchemer.schema(bundled_schema)
       end
 
       def defs_refs(schema)
         if schema.is_a?(Hash)
           if schema['$ref'].is_a?(String)
-            schema['$ref'].gsub!(/#\/?(.*)\/(\w+)/, "#/$defs/\\2")
+            schema['$ref'].gsub!(/#\/?(.*)\/(\w+)/, "#/definitions/\\2")
           end
 
           schema.keys.each do |key|
@@ -122,7 +120,7 @@ module Rswag
 
       def strict_schema(schema)
         if schema.is_a?(Hash)
-          if schema['type'] == 'object' && !schema['properties'].nil? && schema['properties'].keys.length != 0
+          if !schema['properties'].nil? && schema['properties'].keys.length != 0
             if schema['required']&.length != 0
               schema['required'] = schema['properties'].keys
             end
