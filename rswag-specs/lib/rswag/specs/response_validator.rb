@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'active_support/core_ext/hash/slice'
-require 'json_schemer'
+require 'jsi'
 require 'json'
 # require 'rswag/specs/extended_schema'
 
@@ -62,9 +62,11 @@ module Rswag
           # .merge('$schema' => 'http://tempuri.org/rswag/specs/extended_schema')
           .merge(schemas)
 
-        results = schema(validation_schema, metadata).validate(JSON.parse(body))
+        # results = schema(validation_schema, metadata).validate(JSON.parse(body))
+        result = schema(validation_schema, metadata).new_jsi(JSON.parse(body)).jsi_validate
 
-        errors = results.map{ |result| result['error'].presence }.compact
+        # errors = results.map{ |result| result['error'].presence }.compact
+        errors = result.validation_errors.map{ |result| result.message.presence }.compact
         return unless errors.any?
 
         raise UnexpectedResponse,
@@ -75,28 +77,31 @@ module Rswag
       def schema(validation_schema, metadata)
         json_schema = JSON.parse(validation_schema.to_json)
         bundled_schema = {
+          "$schema" => "http://json-schema.org/draft-07/schema#",
           "$defs" => json_schema.dig('components', 'schemas') || json_schema.dig('definitions') || {},
         }.merge(json_schema)
         bundled_schema.delete('components')
         bundled_schema.delete('definitions')
         defs_refs(bundled_schema)
 
-        options = {
-          meta_schema: JSONSchemer.draft202012,
-          ref_resolver: proc do |uri|
-            if uri.to_s == 'http://tempuri.org/rswag/specs/extended_schema'
-              {}
-            else
-              JSON.parse(Net::HTTP.get(uri))
-            end
-          end,
-          format: false,
-        }
+        # options = {
+        #   meta_schema: JSONSchemer.draft202012,
+        #   ref_resolver: proc do |uri|
+        #     if uri.to_s == 'http://tempuri.org/rswag/specs/extended_schema'
+        #       {}
+        #     else
+        #       JSON.parse(Net::HTTP.get(uri))
+        #     end
+        #   end,
+        #   format: false,
+        # }
 
         puts bundled_schema.to_json
-        bundled_schema = JSONSchemer.schema(bundled_schema, **options).bundle
+        # bundled_schema = JSONSchemer.schema(bundled_schema, **options).bundle
+        bundled_schema = is_strict(metadata) ? strict_schema(bundled_schema) : bundled_schema
 
-        JSONSchemer.schema(is_strict(metadata) ? strict_schema(bundled_schema) : bundled_schema, **options)
+        JSI.new_schema(bundled_schema).jsi_schema_module
+        # JSONSchemer.schema(bundled_schema, **options)
       end
 
       def defs_refs(schema)
