@@ -5,7 +5,7 @@ $LOAD_PATH.push File.expand_path('lib', __dir__)
 # Describe your gem and declare its dependencies:
 Gem::Specification.new do |s|
   s.name        = 'rswag-specs'
-  s.version     = ENV['RUBYGEMS_VERSION'] || '0.0.1'
+  s.version     = ENV['RUBYGEMS_VERSION'] || '0.0.2'
   s.authors     = ['Richie Morris', 'Greg Myers', 'Jay Danielian']
   s.email       = ['domaindrivendev@gmail.com']
   s.homepage    = 'https://github.com/rswag/rswag'
