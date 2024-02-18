@@ -24,15 +24,15 @@ module Rswag
 
       def validate_code!(metadata, response)
         expected = metadata[:response][:code].to_s
-        if response.code != expected
-          raise UnexpectedResponse,
-            "Expected response code '#{response.code}' to match '#{expected}'\n" \
-              "Response body: #{response.body}"
-        end
+        return unless response.code != expected
+
+        raise UnexpectedResponse,
+              "Expected response code '#{response.code}' to match '#{expected}'\n" \
+                "Response body: #{response.body}"
       end
 
       def validate_headers!(metadata, headers)
-        header_schemas = (metadata[:response][:headers] || {})
+        header_schemas = metadata[:response][:headers] || {}
         expected = header_schemas.keys
         expected.each do |name|
           nullable_attribute = header_schemas.dig(name.to_s, :schema, :nullable)
@@ -59,13 +59,13 @@ module Rswag
         schemas = definitions_or_component_schemas(swagger_doc, version)
 
         validation_schema = response_schema
-          # .merge('$schema' => 'http://tempuri.org/rswag/specs/extended_schema')
-          .merge(schemas)
+                            # .merge('$schema' => 'http://tempuri.org/rswag/specs/extended_schema')
+                            .merge(schemas)
 
         results = schema(validation_schema, metadata).validate(JSON.parse(body))
         # result = schema(validation_schema, metadata).new_jsi(JSON.parse(body)).jsi_validate
 
-        errors = results.map{ |result| result['error'].presence }.compact
+        errors = results.map { |result| result['error'].presence }.compact
         # errors = result.validation_errors.map{ |result| result.to_json }.compact
         return unless errors.any?
 
@@ -77,42 +77,31 @@ module Rswag
       def schema(validation_schema, metadata)
         json_schema = JSON.parse(validation_schema.to_json)
         bundled_schema = json_schema.merge({
-          "$schema" => "http://json-schema.org/draft-07/schema#",
-          "definitions" => json_schema.dig('components', 'schemas') || json_schema.dig('definitions') || {},
-        })
+                                             'definitions' => json_schema.dig('components',
+                                                                              'schemas') || json_schema.dig('definitions') || {}
+                                           })
         bundled_schema.delete('components')
         defs_refs(bundled_schema)
 
-        # options = {
-        #   meta_schema: JSONSchemer.draft202012,
-        #   ref_resolver: proc do |uri|
-        #     if uri.to_s == 'http://tempuri.org/rswag/specs/extended_schema'
-        #       {}
-        #     else
-        #       JSON.parse(Net::HTTP.get(uri))
-        #     end
-        #   end,
-        #   format: false,
-        # }
+        options = {
+          meta_schema: JSONSchemer.draft202012
+        }
 
-        bundled_schema = JSONSchemer.schema(bundled_schema).bundle
+        bundled_schema = JSONSchemer.schema(bundled_schema, **options).bundle
         bundled_schema = is_strict(metadata) ? strict_schema(bundled_schema) : bundled_schema
 
-        # JSI.new_schema(bundled_schema).jsi_schema_module
-        JSONSchemer.schema(bundled_schema)
+        JSONSchemer.schema(bundled_schema, **options)
       end
 
       def defs_refs(schema)
         if schema.is_a?(Hash)
-          if schema['$ref'].is_a?(String)
-            schema['$ref'].gsub!(/#\/?(.*)\/(\w+)/, "#/definitions/\\2")
-          end
+          schema['$ref'].gsub!(%r{#/?(.*)/(\w+)}, '#/definitions/\\2') if schema['$ref'].is_a?(String)
 
           schema.keys.each do |key|
             defs_refs(schema[key])
           end
         elsif schema.is_a?(Array)
-          schema.each_with_index do |elem, idx|
+          schema.each_with_index do |elem, _idx|
             defs_refs(elem)
           end
         end
@@ -121,20 +110,16 @@ module Rswag
       def strict_schema(schema)
         if schema.is_a?(Hash)
           if !schema['properties'].nil? && schema['properties'].keys.length != 0
-            if schema['required']&.length != 0
-              schema['required'] = schema['properties'].keys
-            end
+            schema['required'] = schema['properties'].keys if schema['required']&.length != 0
 
-            if schema['additionalProperties'] != true
-              schema['additionalProperties'] = false
-            end
+            schema['additionalProperties'] = false if schema['additionalProperties'] != true
           end
 
           schema.keys.each do |key|
             strict_schema(schema[key])
           end
         elsif schema.is_a?(Array)
-          schema.each_with_index do |elem, idx|
+          schema.each_with_index do |elem, _idx|
             strict_schema(elem)
           end
         end
@@ -154,14 +139,12 @@ module Rswag
       def definitions_or_component_schemas(swagger_doc, version)
         if version.start_with?('2')
           swagger_doc.slice(:definitions)
-        else # Openapi3
-          if swagger_doc.key?(:definitions)
-            Rswag::Specs.deprecator.warn('Rswag::Specs: WARNING: definitions is replaced in OpenAPI3! Rename to components/schemas (in swagger_helper.rb)')
-            swagger_doc.slice(:definitions)
-          else
-            components = swagger_doc[:components] || {}
-            { components: components }
-          end
+        elsif swagger_doc.key?(:definitions) # Openapi3
+          Rswag::Specs.deprecator.warn('Rswag::Specs: WARNING: definitions is replaced in OpenAPI3! Rename to components/schemas (in swagger_helper.rb)')
+          swagger_doc.slice(:definitions)
+        else
+          components = swagger_doc[:components] || {}
+          { components: components }
         end
       end
     end
